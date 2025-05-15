@@ -5,7 +5,7 @@ const STATIC_ASSETS = [
     '/index.html',
     '/style.css',
     '/manifest.webmanifest',
-    '/icons/icon-192x192.jpg',
+    '/icons/icon-192x192.png',
     'https://unpkg.com/leaflet@1.9.3/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.9.3/dist/leaflet.js',
     'https://fonts.googleapis.com/css2?family=Poppins&display=swap'
