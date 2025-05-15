@@ -1,4 +1,3 @@
-// Gunakan versi ESM dari idb via unpkg
 import { openDB } from 'https://unpkg.com/idb?module';
 
 const DB_NAME = 'story-app';
