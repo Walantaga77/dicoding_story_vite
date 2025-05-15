@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2D4059" />
+  <meta name="description" content="Dicoding Story App - Cerita dari Pengguna" />
+
+  <title>Dicoding Story App</title>
+
+  <!-- ✅ Web App Manifest -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.jpg" />
+
+  <!-- ✅ CSS & Font -->
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+
+  <!-- ✅ Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" defer></script>
+</head>
+<body>
+  <!-- ✅ Skip to content -->
+  <a href="#main-content" class="skip-link">Lewati ke konten</a>
+
+  <!-- ✅ Header & Nav -->
+  <header>
+    <h1>Dicoding Story App</h1>
+    <nav aria-label="Navigasi utama">
+      <a href="#/" class="nav-auth nav-guest">Beranda</a>
+      <a href="#/upload" class="nav-auth">Upload</a>
+      <a href="#/guest-upload" class="nav-guest">Upload Akun Guest</a>
+      <a href="#/login" class="nav-guest">Login</a>
+      <a href="#/register" class="nav-guest">Register</a>
+      <a href="#" class="nav-auth" onclick="logout()">Logout</a>
+    </nav>
+  </header>
+
+  <!-- ✅ Main -->
+  <main id="main-content" tabindex="-1" role="main">
+    <div id="app"></div>
+  </main>
+
+  <!-- ✅ Footer -->
+  <footer>
+    <p>&copy; 2025 Dicoding Story App</p>
+  </footer>
+
+  <!-- ✅ Entry Point Vite -->
+  <script type="module" src="/src/app.js"></script>
+
+  <!-- ✅ Register Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('✅ Service Worker registered:', reg.scope))
+          .catch(err => console.error('❌ Service Worker registration failed:', err));
+      });
+    }
+
+    // Global logout (pastikan logout() didefinisikan di app.js)
+    window.logout = function () {
+      if (confirm('Yakin ingin logout?')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('name');
+        location.hash = '#/login';
+      }
+    }
+  </script>
+</body>
+</html>
