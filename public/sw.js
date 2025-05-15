@@ -1,4 +1,3 @@
-// Caching static assets (Application Shell)
 const CACHE_NAME = 'dicoding-story-cache-v1';
 const STATIC_ASSETS = [
     '/',
@@ -11,28 +10,30 @@ const STATIC_ASSETS = [
     'https://fonts.googleapis.com/css2?family=Poppins&display=swap'
 ];
 
-
-// Install event - cache App Shell
+// ✅ Install event - cache dengan aman
 self.addEventListener('install', event => {
-    console.log('Service Worker: installing...');
+    console.log('📦 Service Worker: installing...');
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
-            console.log('Service Worker: caching app shell');
-            return cache.addAll(STATIC_ASSETS);
+            return Promise.allSettled(
+                STATIC_ASSETS.map(url => cache.add(url).catch(err => {
+                    console.warn(`⚠️ Gagal cache: ${url}`, err);
+                }))
+            );
         })
     );
     self.skipWaiting();
 });
 
-// Activate event - clean old caches
+// ✅ Activate event - hapus cache lama
 self.addEventListener('activate', event => {
-    console.log('Service Worker: activated');
+    console.log('✅ Service Worker: activated');
     event.waitUntil(
         caches.keys().then(keys =>
             Promise.all(
                 keys.map(key => {
                     if (key !== CACHE_NAME) {
-                        console.log('Removing old cache:', key);
+                        console.log('🧹 Menghapus cache lama:', key);
                         return caches.delete(key);
                     }
                 })
@@ -42,37 +43,30 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// Fetch event - serve cached if offline
+// ✅ Fetch event - gunakan cache saat offline
 self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request).then(response =>
-            response || fetch(event.request).catch(() => {
-                return new Response('Offline 😕', {
+            response || fetch(event.request).catch(() =>
+                new Response('❌ Offline dan file tidak tersedia.', {
                     headers: { 'Content-Type': 'text/plain' }
-                });
-            })
+                })
+            )
         )
     );
 });
 
-// Push Notification Listener
+// ✅ Push Notification
 self.addEventListener('push', async (event) => {
-    console.log("Push event masuk");
-
-    if (!event.data) {
-        console.warn('📭 Push event tanpa payload');
-        return;
-    }
+    if (!event.data) return;
 
     let data;
     try {
         data = event.data.json();
-        console.log("Payload berupa JSON:", data);
     } catch (e) {
-        console.warn('⚠️ Payload bukan JSON, fallback ke text.', e);
-        const fallbackText = await event.data.text(); // <-- penting
+        const fallbackText = await event.data.text();
         data = {
-            title: 'Notifikasi',
+            title: '📩 Notifikasi',
             options: {
                 body: fallbackText,
                 data: { url: '/' }
@@ -85,8 +79,8 @@ self.addEventListener('push', async (event) => {
     event.waitUntil(
         self.registration.showNotification(title, {
             ...options,
-            icon: './icons/icon-192x192.jpg',
-            badge: './icons/icon-192x192.jpg',
+            icon: '/icons/icon-192x192.png',
+            badge: '/icons/icon-192x192.png',
             data: {
                 url: options?.data?.url || '/'
             }
@@ -94,8 +88,7 @@ self.addEventListener('push', async (event) => {
     );
 });
 
-
-// Klik Notifikasi → buka / fokus tab
+// ✅ Klik notifikasi → buka tab
 self.addEventListener('notificationclick', event => {
     event.notification.close();
     const url = event.notification.data?.url || '/';
