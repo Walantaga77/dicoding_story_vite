@@ -2,7 +2,6 @@ import UploadPresenter from '../presenters/UploadPresenter.js';
 
 const UploadView = {
   async render(container) {
-
     const token = localStorage.getItem('token');
     if (!token) {
       container.innerHTML = `
@@ -47,28 +46,35 @@ const UploadView = {
           <div>
             <label for="location">Pilih Lokasi:</label>
             <div id="map" style="height: 300px; margin-bottom: 1rem;"></div>
-            <input type="hidden" id="lat">
-            <input type="hidden" id="lon">
+            <input type="hidden" id="lat" />
+            <input type="hidden" id="lon" />
           </div>
 
-          <button type="submit">Kirim Cerita</button>
+          <button type="submit" id="submit-btn">Kirim Cerita</button>
         </form>
-        <div id="result"></div>
+        <div id="result" role="alert" style="margin-top: 1rem;"></div>
       </section>
     `;
 
-    UploadPresenter.initMap('map');
+    // Callback supaya Presenter bisa memberi update lokasi ke View (update input lat/lon)
+    UploadPresenter.initMap('map', (lat, lon) => {
+      document.getElementById('lat').value = lat;
+      document.getElementById('lon').value = lon;
+    });
 
-    // Variabel global kamera dan preview
     const video = document.getElementById('camera');
     const canvas = document.getElementById('snapshot');
     const ctx = canvas.getContext('2d');
     const preview = document.getElementById('preview-image');
     const clearBtn = document.getElementById('clear-photo');
+    const fileUpload = document.getElementById('file-upload');
+    const submitBtn = document.getElementById('submit-btn');
+    const resultEl = document.getElementById('result');
+
     let currentPhotoBlob = null;
     let cameraStream = null;
+    let previewUrl = null;
 
-    // 🔧 Fungsi untuk mematikan kamera
     function stopCamera() {
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
@@ -77,88 +83,127 @@ const UploadView = {
       }
     }
 
-    // 🎥 Aktifkan kamera
-    if (navigator.mediaDevices?.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          cameraStream = stream;
-          video.srcObject = stream;
-        })
-        .catch(err => {
-          console.error('Gagal akses kamera:', err);
-        });
+    // Revoke object URL untuk menghindari memory leak
+    function revokePreviewUrl() {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
     }
 
-    // 📸 Ambil gambar dari kamera
+    // Inisialisasi kamera
+    async function startCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        console.warn('Browser tidak mendukung akses kamera.');
+        return;
+      }
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = cameraStream;
+      } catch (err) {
+        console.error('Gagal akses kamera:', err);
+      }
+    }
+    startCamera();
+
+    // Ambil foto dari kamera
     document.getElementById('take-picture').addEventListener('click', () => {
+      if (!cameraStream) {
+        alert('Kamera belum aktif.');
+        return;
+      }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => {
+      canvas.toBlob(blob => {
         currentPhotoBlob = blob;
-        const previewUrl = URL.createObjectURL(blob);
+        revokePreviewUrl();
+        previewUrl = URL.createObjectURL(blob);
         preview.src = previewUrl;
         preview.style.display = 'block';
         clearBtn.style.display = 'inline-block';
+
+        // Reset file upload supaya tidak bentrok
+        fileUpload.value = '';
       }, 'image/jpeg');
     });
 
-    // 📂 Upload dari file
-    document.getElementById('file-upload').addEventListener('change', (e) => {
+    // Upload dari file
+    fileUpload.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
         currentPhotoBlob = file;
-        const previewUrl = URL.createObjectURL(file);
+        revokePreviewUrl();
+        previewUrl = URL.createObjectURL(file);
         preview.src = previewUrl;
         preview.style.display = 'block';
         clearBtn.style.display = 'inline-block';
       }
     });
 
-    // ❌ Hapus gambar
+    // Clear preview & reset photo
     clearBtn.addEventListener('click', () => {
       currentPhotoBlob = null;
+      revokePreviewUrl();
       preview.src = '';
       preview.style.display = 'none';
       clearBtn.style.display = 'none';
-      document.getElementById('file-upload').value = '';
+      fileUpload.value = '';
     });
 
-    // 🔙 Tombol kembali
+    // Tombol kembali
     document.getElementById('back-button').addEventListener('click', () => {
-      stopCamera(); // ✅ matikan kamera
+      stopCamera();
       location.hash = '#/';
     });
 
-    // 📤 Submit form
-    const form = document.getElementById('upload-form');
-    form.addEventListener('submit', async (e) => {
+    // Submit form
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const description = document.getElementById('description').value;
+
+      if (!currentPhotoBlob) {
+        resultEl.textContent = '❌ Silakan ambil gambar dari kamera atau unggah file.';
+        resultEl.style.color = 'red';
+        return;
+      }
+
+      const description = document.getElementById('description').value.trim();
       const lat = document.getElementById('lat').value;
       const lon = document.getElementById('lon').value;
-      const resultEl = document.getElementById('result');
 
-      const photo = currentPhotoBlob;
-
-      if (!photo) {
-        resultEl.textContent = '❌ Silakan ambil gambar dari kamera atau unggah file.';
+      if (!description) {
+        resultEl.textContent = '❌ Deskripsi tidak boleh kosong.';
+        resultEl.style.color = 'red';
         return;
       }
 
       try {
-        await UploadPresenter.uploadStory(description, photo, lat, lon);
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Mengunggah...';
+
+        await UploadPresenter.uploadStory(description, currentPhotoBlob, lat, lon);
+
         resultEl.textContent = '✅ Cerita berhasil diunggah!';
-        form.reset();
+        resultEl.style.color = 'green';
+
+        // Reset form
+        e.target.reset();
+        currentPhotoBlob = null;
+        revokePreviewUrl();
         preview.src = '';
         preview.style.display = 'none';
         clearBtn.style.display = 'none';
-        currentPhotoBlob = null;
-        stopCamera(); // ✅ matikan kamera setelah upload
+
+        stopCamera();
+
       } catch (err) {
-        resultEl.textContent = '❌ ' + err.message;
+        resultEl.textContent = `❌ ${err.message}`;
+        resultEl.style.color = 'red';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Kirim Cerita';
       }
     });
 
-    // 🚫 Pastikan kamera dimatikan saat berpindah halaman
+    // Pastikan kamera dimatikan saat pindah halaman
     window.addEventListener('beforeunload', stopCamera);
     window.addEventListener('hashchange', stopCamera);
   }

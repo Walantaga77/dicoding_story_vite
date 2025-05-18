@@ -1,8 +1,11 @@
 const UploadPresenter = {
     map: null,
     marker: null,
+    onLocationSelected: null, // callback dari View
 
-    initMap(mapId) {
+    initMap(mapId, onLocationSelected) {
+        this.onLocationSelected = onLocationSelected;
+
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
         });
@@ -38,8 +41,10 @@ const UploadPresenter = {
                 this.marker = L.marker([lat, lng]).addTo(this.map);
             }
 
-            document.getElementById('lat').value = lat;
-            document.getElementById('lon').value = lng;
+            // panggil callback ke View untuk update UI
+            if (typeof this.onLocationSelected === 'function') {
+                this.onLocationSelected(lat, lng);
+            }
         });
     },
 
@@ -82,7 +87,6 @@ const UploadPresenter = {
         if (!res.ok) throw new Error(result.message);
         return result;
     }
-
 };
 
 export default UploadPresenter;

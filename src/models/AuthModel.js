@@ -11,8 +11,7 @@ const AuthModel = {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message);
 
-        localStorage.setItem('token', data.loginResult.token);
-        return data.loginResult;
+        return data.loginResult; // Kembalikan token dan name, jangan simpan ke localStorage
     },
 
     async register(name, email, password) {
@@ -25,7 +24,7 @@ const AuthModel = {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message);
         return data;
-    },
+    }
 };
 
 export default AuthModel;

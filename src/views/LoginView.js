@@ -16,6 +16,7 @@ const LoginView = {
           </div>
           <button type="submit" class="auth-btn">Login</button>
         </form>
+        <p id="login-message" class="auth-message"></p>
         <p class="auth-toggle">Belum punya akun? <a href="#/register">Register di sini</a></p>
       </section>
     `;
@@ -25,8 +26,26 @@ const LoginView = {
       e.preventDefault();
       const email = form.email.value;
       const password = form.password.value;
-      LoginPresenter.login(email, password);
+      LoginPresenter.login(email, password, this); // ✅ pass `this` as the view
     });
+  },
+
+  showLoading() {
+    const msg = document.getElementById('login-message');
+    if (msg) msg.textContent = '🔄 Sedang login...';
+  },
+
+  showLoginSuccess(name) {
+    const msg = document.getElementById('login-message');
+    if (msg) msg.textContent = `✅ Selamat datang, ${name}!`;
+    setTimeout(() => {
+      location.hash = '#/';
+    }, 1000);
+  },
+
+  showLoginError(errorMessage) {
+    const msg = document.getElementById('login-message');
+    if (msg) msg.textContent = `❌ Login gagal: ${errorMessage}`;
   },
 };
 

@@ -1,15 +1,21 @@
 import AuthModel from '../models/AuthModel.js';
 
 const LoginPresenter = {
-    async login(email, password) {
+    async login(email, password, view) {
         try {
-            await AuthModel.login(email, password); // Token disimpan di AuthModel
-            alert('✅ Login berhasil!');
+            view.showLoading();
+            const loginResult = await AuthModel.login(email, password);
 
-            await this.subscribePushNotification(); // ✅ Push notification
-            // location.hash = '#/';
+            // Simpan token
+            localStorage.setItem('token', loginResult.token);
+            localStorage.setItem('name', loginResult.name);
+
+            // Lanjut subscribe push
+            await this.subscribePushNotification();
+
+            view.showLoginSuccess(loginResult.name); // tanggung jawab View
         } catch (err) {
-            alert(`❌ Login gagal: ${err.message}`);
+            view.showLoginError(err.message);
         }
     },
 
@@ -19,34 +25,20 @@ const LoginPresenter = {
             return;
         }
 
-        console.log('masuk dsini');
-
-
         try {
-
-            console.log('before reg');
-
-            const reg = await navigator.serviceWorker.register('../../sw.js');
-
-            console.log('after reg');
-
-
+            const reg = await navigator.serviceWorker.register('/sw.js'); // gunakan root path
 
             const subscription = await reg.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey:
-                    this.urlBase64ToUint8Array(
-                        'BCCs2eonMI-6H2ctvFaWg-UYdDv387Vno_bzUzALpB442r2lCnsHmtrx8biyPi_E-1fSGABK_Qs_GlvPoJJqxbk'
-                    ),
+                applicationServerKey: this.urlBase64ToUint8Array(
+                    'BCCs2eonMI-6H2ctvFaWg-UYdDv387Vno_bzUzALpB442r2lCnsHmtrx8biyPi_E-1fSGABK_Qs_GlvPoJJqxbk'
+                ),
             });
 
             const cleanSub = {
                 endpoint: subscription.endpoint,
                 keys: subscription.toJSON().keys,
             };
-
-            console.log('apakah lewat ini');
-
 
             const token = localStorage.getItem('token');
             if (!token) return;
@@ -60,20 +52,12 @@ const LoginPresenter = {
                 body: JSON.stringify(cleanSub),
             });
 
-            console.log('setelah res');
-
-            // console.log('setelah res2', res.json());
-
             const result = await res.json();
-
-            console.log('apakah resultnya', result);
-
             if (!res.ok) throw new Error(result.message);
+
             console.log('✅ Push berhasil disubscribe:', result);
-            location.hash = '#/';
-        } catch (error) {
-            console.error('❌ Gagal subscribe push notification:', error.message);
-            location.hash = '#/';
+        } catch (err) {
+            console.error('❌ Gagal subscribe push notification:', err.message);
         }
     },
 
@@ -82,7 +66,7 @@ const LoginPresenter = {
         const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
         const rawData = atob(base64);
         return new Uint8Array([...rawData].map((c) => c.charCodeAt(0)));
-    }
+    },
 };
 
 export default LoginPresenter;
