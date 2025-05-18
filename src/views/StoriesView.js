@@ -1,4 +1,4 @@
-import { StoryDB } from '../utils/db.js';
+import SavedStoryDB from '../utils/db.js';
 
 const StoriesView = {
   currentPage: 1,
@@ -6,11 +6,11 @@ const StoriesView = {
 
   async render(container) {
     const token = localStorage.getItem('token');
-
     if (!token) {
-      container.innerHTML = '<p style="color:red;">Data tidak lengkap. Silakan login dan pilih cerita.</p>';
+      container.innerHTML = '<p style="color:red;">Silakan login untuk melihat cerita.</p>';
       return;
     }
+
     container.innerHTML = `
       <section>
         <h2>📚 Semua Postingan</h2>
@@ -19,21 +19,8 @@ const StoriesView = {
           <button id="prev-btn">⬅️ Sebelumnya</button>
           <button id="next-btn">Selanjutnya ➡️</button>
         </div>
-        <div style="margin-top: 1rem;">
-          <button button id="clear-cache-btn">🗑️ Hapus Cerita Tersimpan (Offline)</button>
-        </div>
       </section>
     `;
-
-    document.getElementById('clear-cache-btn').addEventListener('click', async () => {
-      const confirmDelete = confirm('Yakin ingin menghapus semua data cerita tersimpan secara offline?');
-      if (confirmDelete) {
-        const { default: db } = await import('../utils/db.js');
-        await db.clear('stories');
-        alert('✅ Cache cerita berhasil dihapus!');
-      }
-    });
-
 
     document.getElementById('prev-btn').addEventListener('click', () => {
       if (this.currentPage > 1) {
@@ -61,21 +48,13 @@ const StoriesView = {
       const res = await fetch(`https://story-api.dicoding.dev/v1/stories?page=${this.currentPage}&size=${this.pageSize}&location=0`, {
         headers,
       });
-      const data = await res.json();
 
+      const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
-      // ✅ Simpan data ke IndexedDB
-      await StoryDB.saveStories(data.listStory);
       this.displayStories(data.listStory);
     } catch (err) {
-      console.warn('🌐 Offline, menggunakan cache lokal:', err.message);
-      const localStories = await StoryDB.getAllStories();
-      if (localStories.length > 0) {
-        this.displayStories(localStories);
-      } else {
-        storiesContainer.innerHTML = '<p style="color: red;">Gagal memuat cerita dan tidak ada cache.</p>';
-      }
+      storiesContainer.innerHTML = `<p style="color:red;">🌐 Gagal memuat cerita: ${err.message}</p>`;
     }
   },
 
@@ -92,17 +71,25 @@ const StoriesView = {
       const card = document.createElement('div');
       card.className = 'story-card';
       card.innerHTML = `
-        <div class="story-card-content">
-          <img src="${story.photoUrl}" alt="Foto oleh ${story.name}" class="story-image" />
-          <div class="story-info">
-            <h3>${story.name}</h3>
-            <p>${story.description}</p>
-            <small><em>${new Date(story.createdAt).toLocaleString()}</em></small>
-            <a href="#/detail?id=${story.id}" class="detail-link">Lihat Detail ➜</a>
-          </div>
+      <div class="story-card-content">
+        <img src="${story.photoUrl}" alt="Foto oleh ${story.name}" class="story-image" />
+        <div class="story-info">
+          <h3>${story.name}</h3>
+          <p>${story.description}</p>
+          <small><em>${new Date(story.createdAt).toLocaleString()}</em></small>
+          <a href="#/detail?id=${story.id}" class="detail-link">Lihat Detail ➜</a>
+          <button class="save-btn" data-id="${story.id}">❤️ Simpan</button>
         </div>
-      `;
+      </div>
+    `;
       storiesContainer.appendChild(card);
+
+      // Tambahkan event listener untuk tombol "Simpan"
+      const saveBtn = card.querySelector('.save-btn');
+      saveBtn.addEventListener('click', async () => {
+        await SavedStoryDB.save(story);
+        alert('✅ Cerita disimpan ke Favorite!');
+      });
     });
 
     document.getElementById('prev-btn').disabled = this.currentPage === 1;

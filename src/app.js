@@ -41,6 +41,10 @@ function updateNavVisibility() {
     document.querySelectorAll('.nav-guest').forEach(el => {
         el.style.display = isLoggedIn ? 'none' : 'inline';
     });
+
+    // Tampilkan tombol subscribe/unsubscribe hanya saat login
+    document.getElementById('btn-subscribe')?.classList.toggle('hidden', !isLoggedIn);
+    document.getElementById('btn-unsubscribe')?.classList.toggle('hidden', !isLoggedIn);
 }
 
 function setupSkipLink() {
@@ -61,28 +65,32 @@ window.logout = function () {
     }
 };
 
-// Push Notification Subscription
+// ✅ Push Notification via Tombol
 async function subscribePushNotification() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        console.warn('🔕 Push notification tidak didukung di browser ini.');
+        alert('🔕 Push notification tidak didukung di browser ini.');
         return;
     }
 
     try {
-        // 🔧 Sesuaikan path berdasarkan lokasi file saat ini (src ➜ ../sw.js)
-        const reg = await navigator.serviceWorker.register('../sw.js');
-        console.log('✅ Service Worker terdaftar:', reg);
+        const reg = await navigator.serviceWorker.ready;
 
         const subscription = await reg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey:
-                urlBase64ToUint8Array(
-                    'BCCs2eonMI-6H2ctvFaWg-UYdDv387Vno_bzUzALpB442r2lCnsHmtrx8biyPi_E-1fSGABK_Qs_GlvPoJJqxbk'
-                ),
+            applicationServerKey: urlBase64ToUint8Array(
+                'BCCs2eonMI-6H2ctvFaWg-UYdDv387Vno_bzUzALpB442r2lCnsHmtrx8biyPi_E-1fSGABK_Qs_GlvPoJJqxbk'
+            ),
         });
 
         const token = localStorage.getItem('token');
-        if (!token) return;
+        if (!token) {
+            alert('❗ Token tidak ditemukan');
+            return;
+        }
+
+        // 🔧 Kirim hanya properti yang dibutuhkan
+        const { endpoint, keys } = subscription.toJSON();
+        const filteredSubscription = { endpoint, keys };
 
         const res = await fetch('https://story-api.dicoding.dev/v1/notifications/subscribe', {
             method: 'POST',
@@ -90,22 +98,41 @@ async function subscribePushNotification() {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(subscription),
+            body: JSON.stringify(filteredSubscription),
         });
 
         const result = await res.json();
         if (!res.ok) throw new Error(result.message);
 
-        console.log('✅ Push Notification berhasil disubscribe:', result);
+        alert('✅ Berhasil subscribe notifikasi!');
     } catch (err) {
-        console.error('❌ Gagal register push notification:', err.message);
+        console.error('❌ Gagal subscribe:', err.message);
+        alert('❌ Gagal subscribe: ' + err.message);
+    }
+}
+
+
+async function unsubscribePushNotification() {
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const subscription = await reg.pushManager.getSubscription();
+
+        if (subscription) {
+            await subscription.unsubscribe();
+            alert('🚫 Notifikasi telah dihentikan.');
+        } else {
+            alert('❌ Belum ada langganan aktif.');
+        }
+    } catch (err) {
+        console.error('❌ Gagal unsubscribe:', err.message);
+        alert('❌ Gagal unsubscribe: ' + err.message);
     }
 }
 
 // Helper konversi VAPID key
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
     const rawData = atob(base64);
     return new Uint8Array([...rawData].map(char => char.charCodeAt(0)));
 }
@@ -115,9 +142,12 @@ window.addEventListener('DOMContentLoaded', () => {
     updateNavVisibility();
     route();
     setupSkipLink();
+
+    document.getElementById('btn-subscribe')?.addEventListener('click', subscribePushNotification);
+    document.getElementById('btn-unsubscribe')?.addEventListener('click', unsubscribePushNotification);
 });
 
 window.addEventListener('hashchange', route);
 
-// Ekspor fungsi jika dibutuhkan di tempat lain
+// Ekspor jika dibutuhkan
 window.subscribePushNotification = subscribePushNotification;

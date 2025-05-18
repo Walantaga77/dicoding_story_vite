@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dicoding-story-cache-v1';
+const CACHE_NAME = 'dicoding-story-cache-v2';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -10,22 +10,24 @@ const STATIC_ASSETS = [
     'https://fonts.googleapis.com/css2?family=Poppins&display=swap'
 ];
 
-// ✅ Install event - cache dengan aman
+// Install: cache app shell
 self.addEventListener('install', event => {
     console.log('📦 Service Worker: installing...');
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
             return Promise.allSettled(
-                STATIC_ASSETS.map(url => cache.add(url).catch(err => {
-                    console.warn(`⚠️ Gagal cache: ${url}`, err);
-                }))
+                STATIC_ASSETS.map(url =>
+                    cache.add(url).catch(err => {
+                        console.warn(`⚠️ Gagal cache: ${url}`, err);
+                    })
+                )
             );
         })
     );
     self.skipWaiting();
 });
 
-// ✅ Activate event - hapus cache lama
+// Activate: hapus cache lama
 self.addEventListener('activate', event => {
     console.log('✅ Service Worker: activated');
     event.waitUntil(
@@ -43,8 +45,29 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// ✅ Fetch event - gunakan cache saat offline
+// Fetch: strategi cache-first, tapi jangan cache non-GET
 self.addEventListener('fetch', event => {
+    if (event.request.method !== 'GET') return;
+
+    const url = new URL(event.request.url);
+
+    // Cache response dari API story saat offline
+    if (url.origin === 'https://story-api.dicoding.dev' && url.pathname.startsWith('/v1/stories')) {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, clone);
+                    });
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    // Cache-first untuk asset lainnya
     event.respondWith(
         caches.match(event.request).then(response =>
             response || fetch(event.request).catch(() =>
@@ -53,52 +76,5 @@ self.addEventListener('fetch', event => {
                 })
             )
         )
-    );
-});
-
-// ✅ Push Notification
-self.addEventListener('push', async (event) => {
-    if (!event.data) return;
-
-    let data;
-    try {
-        data = event.data.json();
-    } catch (e) {
-        const fallbackText = await event.data.text();
-        data = {
-            title: '📩 Notifikasi',
-            options: {
-                body: fallbackText,
-                data: { url: '/' }
-            }
-        };
-    }
-
-    const { title, options } = data;
-
-    event.waitUntil(
-        self.registration.showNotification(title, {
-            ...options,
-            icon: '/icons/icon-192x192.png',
-            badge: '/icons/icon-192x192.png',
-            data: {
-                url: options?.data?.url || '/'
-            }
-        })
-    );
-});
-
-// ✅ Klik notifikasi → buka tab
-self.addEventListener('notificationclick', event => {
-    event.notification.close();
-    const url = event.notification.data?.url || '/';
-
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-            for (const client of clientList) {
-                if (client.url.includes(url) && 'focus' in client) return client.focus();
-            }
-            return clients.openWindow(url);
-        })
     );
 });

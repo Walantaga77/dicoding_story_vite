@@ -4,6 +4,8 @@ import RegisterView from '../views/RegisterView.js';
 import UploadView from '../views/UploadView.js';
 import DetailView from '../views/DetailView.js';
 import GuestUploadView from '../views/GuestUploadView.js';
+import SavedStoriesView from '../views/SavedStoriesView.js';
+
 
 export default {
     '#/': StoriesView,
@@ -12,4 +14,5 @@ export default {
     '#/upload': UploadView,
     '#/guest-upload': GuestUploadView,
     '#/detail': DetailView,
+    '#/saved': SavedStoriesView,
 };
